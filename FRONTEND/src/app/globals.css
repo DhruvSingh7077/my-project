@@ -1,0 +1,44 @@
+/* src/app/globals.css — Tailwind v4 safe version */
+@import "tailwindcss";
+
+/* CSS variables instead of @theme inline (avoids editor/linter warnings) */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* tokens you might want to reference in CSS */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* Basic reset + sensible defaults (you can keep or edit) */
+* { box-sizing: border-box; }
+html, body, #__next { height: 100%; }
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #0a0a0a;
+}
+
+/* small helper container you can use in layout */
+.container {
+  max-width: 96rem; /* 1536px */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
