@@ -5,41 +5,86 @@ import React, { useEffect, useState } from "react";
 import MemberForm from "./MemberForm";
 import MemberList from "./MemberList";
 import MemberStats from "./MemberStats";
-import { Member } from "@/lib/types";
+import { Member, MembershipType, Sport } from "@/lib/types";
 import Button from "@/components/ui/Button";
 import { api, ApiError } from "@/lib/apiClient";
+
+/**
+ * Backend response shape (snake_case) — replace `any` usage with this type.
+ */
+type ApiMember = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  linkedin?: string;
+  referred_by?: string;
+  membership_type: string;
+  sports?: string[];
+  why_join?: string | null;
+  contribution?: string | null;
+  created_at?: string;
+  error?: string;
+  message?: string;
+};
 
 export default function MembersManager() {
   const [members, setMembers] = useState<Member[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+
+  // helper to map API (snake_case) -> Member (camelCase)
+  function mapApiToMember(apiUser: ApiMember): Member {
+    return {
+      id: apiUser.id,
+      name: apiUser.full_name,
+      email: apiUser.email,
+      phone: apiUser.phone,
+      linkedin: apiUser.linkedin,
+      referredBy: apiUser.referred_by,
+      membership: apiUser.membership_type as MembershipType,
+      sports: (apiUser.sports ?? []) as Sport[],
+      joiningReason: apiUser.why_join ?? "",
+      contribution: apiUser.contribution ?? "",
+      createdAt: apiUser.created_at ?? new Date().toISOString(),
+    };
+  }
+
+  async function fetchMembers() {
+    try {
+      setLoading(true);
+      setError("");
+      const data = await api<ApiMember[]>("/users");
+      if (!data || !Array.isArray(data)) {
+        setError("Failed to load members: invalid response");
+        return;
+      }
+      setMembers(data.map(mapApiToMember));
+    } catch (err) {
+      console.error("Failed to fetch members:", err);
+      setError(
+        err instanceof ApiError ? err.message : "Failed to load members"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchMembers() {
-      try {
-        setLoading(true);
-        const data = await api<Member[]>("/users");
-        setMembers(
-          data.map((m) => ({
-            ...m,
-            createdAt: m.createdAt || new Date().toISOString(),
-          }))
-        );
-      } catch (err) {
-        console.error("Failed to fetch members:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchMembers();
   }, []);
 
   async function addMember(m: Member) {
     try {
+      if (!m.name?.trim() || !m.email?.trim()) {
+        setError("Name and email are required");
+        return;
+      }
+
       const payload = {
-        full_name: m.name?.trim(),
-        email: m.email?.trim(),
+        full_name: m.name.trim(),
+        email: m.email.trim().toLowerCase(), // Ensure lowercase
         phone: m.phone?.trim() || undefined,
         linkedin: m.linkedin?.trim() || undefined,
         referred_by: m.referredBy?.trim() || undefined,
@@ -49,30 +94,41 @@ export default function MembersManager() {
         contribution: m.contribution?.trim() || undefined,
       };
 
-      const savedUser = await api<Member>("/users/register", {
+      // First check if email exists
+      const existingMembers = await api<ApiMember[]>("/users");
+      const emailExists = existingMembers.some(
+        (m) => m.email.toLowerCase() === payload.email.toLowerCase()
+      );
+
+      if (emailExists) {
+        setError(`Email ${payload.email} is already registered`);
+        return;
+      }
+
+      // If email doesn't exist, proceed with registration
+      const savedUser = await api<ApiMember>("/users/register", {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
-      setMembers((prev) => [savedUser, ...prev]);
+      const newMember = mapApiToMember(savedUser);
+      setMembers((prev) => [newMember, ...prev]);
+      setError("");
+      setShowAdd(false);
     } catch (err: unknown) {
+      console.error("Failed to add member:", err);
+
       if (err instanceof ApiError) {
-        // Always log message + details
-        console.error("Backend error:", err.message, err.details);
-        // If details is array (class-validator errors), show first one
-        if (Array.isArray(err.details)) {
-          const firstError = err.details[0];
-          const msg = firstError?.constraints
-            ? Object.values(firstError.constraints)[0]
-            : err.message;
-          alert(`Error: ${msg}`);
-        } else {
-          alert(`Error: ${err.message || JSON.stringify(err.details)}`);
+        // Handle specific API errors
+        const message = err.message || "Failed to add member";
+        setError(message);
+
+        // If it's a conflict error, refresh the members list
+        if (err.status === 409) {
+          await fetchMembers();
         }
-      } else if (err instanceof Error) {
-        alert(`Unexpected error: ${err.message}`);
       } else {
-        alert("An unknown error occurred");
+        setError("An unexpected error occurred");
       }
     }
   }
@@ -83,14 +139,28 @@ export default function MembersManager() {
         <div>
           <h2 className="text-xl font-semibold">Members</h2>
           <p className="text-sm text-gray-500">
-            Manage members and membership types (local state only — v0).
+            Manage members and membership types
           </p>
         </div>
         <Button onClick={() => setShowAdd(true)}>Add Member</Button>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
       <MemberStats members={members} />
-      {loading ? <p>Loading members...</p> : <MemberList members={members} />}
+      {loading ? (
+        <div className="text-center py-4">
+          <p>Loading members...</p>
+        </div>
+      ) : members.length === 0 && !error ? (
+        <p className="text-center py-4 text-gray-500">No members found</p>
+      ) : (
+        <MemberList members={members} />
+      )}
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

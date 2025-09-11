@@ -1,9 +1,29 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { Request, Response, NextFunction } from 'express';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Parse JSON first
+  app.use(bodyParser.json());
+
+  // Middleware: Coerce full_name to string only for POST/PUT/PATCH requests
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (
+      ['POST', 'PUT', 'PATCH'].includes(req.method) &&
+      req.body &&
+      typeof req.body === 'object'
+    ) {
+      const body = req.body as Record<string, any>;
+      if (body.full_name != null) {
+        body.full_name = String(body.full_name).trim();
+      }
+    }
+    next();
+  });
 
   // Enable validation globally
   app.useGlobalPipes(

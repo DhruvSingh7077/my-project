@@ -2,6 +2,12 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { api, ApiError } from "@/lib/apiClient";
+
+type LoginResponse = {
+  access_token?: string;
+  message?: string;
+};
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -20,34 +26,26 @@ export default function AdminLoginPage() {
 
     setLoading(true);
     try {
-      // Replace this URL with the backend route your backend dev exposes
-      const resp = await fetch("/api/admin/login", {
+      const response = await api<LoginResponse>("/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        setError(data?.message || "Invalid credentials");
-        setLoading(false);
-        return;
-      }
-
-      // Example: backend returns { token, user }
-      if (data?.token) {
-        // store token (you can also use cookies) and then navigate
-        localStorage.setItem("rackets_token", data.token);
-        // optional: store user info
-        localStorage.setItem("rackets_user", JSON.stringify(data.user || {}));
-        router.push("/dashboard");
+      if (response.access_token) {
+        localStorage.setItem("adminToken", response.access_token);
+        router.push("/members");
       } else {
-        setError("Login failed — unexpected response from server");
+        setError("Login failed - Invalid response from server");
       }
     } catch (err) {
-      console.error(err);
-      setError("Network error. Try again.");
+      console.error("Login error:", err);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred");
+      }
     } finally {
       setLoading(false);
     }
@@ -56,22 +54,35 @@ export default function AdminLoginPage() {
   return (
     <div className="w-full max-w-2xl bg-white rounded-2xl shadow-md p-10">
       <div className="flex flex-col items-center">
-        {/* simple circle + crossed-racket-esque icon */}
+        {/* Keeping your existing icon */}
         <div className="w-24 h-24 rounded-full border-2 border-black flex items-center justify-center mb-6">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <circle cx="12" cy="12" r="9" stroke="black" strokeWidth="1" />
-            <path d="M6 6L18 18M6 18L18 6" stroke="black" strokeWidth="1" strokeLinecap="round" />
+            <path
+              d="M6 6L18 18M6 18L18 6"
+              stroke="black"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
           </svg>
         </div>
 
-        <h1 className="text-3xl text-gray-600 font-extrabold mb-6">Admin Login</h1>
+        <h1 className="text-3xl text-gray-600 font-extrabold mb-6">
+          Admin Login
+        </h1>
 
         <form className="w-full max-w-xl" onSubmit={handleSubmit}>
           <label className="block mb-2 font-medium text-black">Username</label>
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter username (e.g., admin)"
+            placeholder="Enter username"
             className="w-full border rounded-lg p-4 mb-2 placeholder:italic placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
           />
 
@@ -84,9 +95,7 @@ export default function AdminLoginPage() {
             className="w-full border rounded-lg p-4 mb-6 placeholder:italic placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
           />
 
-          {error && (
-            <div className="mb-4 text-red-600">{error}</div>
-          )}
+          {error && <div className="mb-4 text-red-600">{error}</div>}
 
           <button
             type="submit"
@@ -99,7 +108,9 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <p className="text-sm text-gray-500 mt-6">Designed for Rackets & Returns Admin Panel — v0</p>
+        <p className="text-sm text-gray-500 mt-6">
+          Designed for Rackets & Returns Admin Panel — v0
+        </p>
       </div>
     </div>
   );

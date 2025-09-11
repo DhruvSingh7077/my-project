@@ -5,13 +5,28 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Member, MembershipType, Sport } from "@/lib/types";
-import { api, ApiError } from "@/lib/apiClient";
 
 // Type for backend class-validator errors
 // type ValidationError = {
 //   property: string;
 //   constraints?: Record<string, string>;
 // };
+
+type ApiMemberResponse = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  linkedin?: string;
+  referred_by?: string;
+  membership_type: string;
+  sports: string[];
+  why_join?: string | null;
+  contribution?: string | null;
+  created_at?: string;
+  error?: string;
+  message?: string;
+};
 
 const sportsList: Sport[] = [
   "Tennis",
@@ -95,58 +110,35 @@ export default function MemberForm({ onAdd, onClose }: Props) {
 
   const [formError, setFormError] = useState("");
 
-  const onSubmit: SubmitHandler<FormValues> = async (data) => {
-    console.log("=== Form Submitted Data ===", data);
-    try {
-      setFormError("");
+  const onSubmit: SubmitHandler<FormValues> = (data) => {
+    setFormError("");
 
-      //Step 1: Ensure full_name is non-empty
-      const fullName = data.name?.trim();
-      // console.log("Trimmed fullName:", fullName);
-      // if (!fullName) {
-      //   setFormError("Full name is required");
-      //   console.warn("Full name is empty!");
-      //   return; // stop submission
-      // }
-
-      // ✅ Step 2: Prepare payload and optionally log it
-      const payload = {
-        full_name: fullName, // already trimmed
-        email: data.email, // already trimmed
-        phone: data.phone || undefined,
-        linkedin: data.linkedin || undefined,
-        referred_by: data.referredBy || undefined,
-        membership_type: data.membership,
-        sports: data.sports ?? [],
-        why_join: data.joiningReason || undefined,
-        contribution: data.contribution || undefined,
-      };
-
-      console.log("Sending payload:", payload);
-
-      const savedUser = await api<Member>("/users/register", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      console.log("Backend response:", savedUser);
-
-      onAdd(savedUser);
-      reset();
-      onClose();
-    } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        // Log backend error for debugging
-        console.error("Backend error:", err.message, err.details);
-
-        // Only show generic form error, ignore field-level backend validation
-        setFormError(err.message || "Something went wrong.");
-      } else if (err instanceof Error) {
-        setFormError(err.message || "Something went wrong.");
-      } else {
-        setFormError("An unknown error occurred.");
-      }
+    const fullName = data.name?.trim() || "";
+    if (!fullName) {
+      setFormError("Full name is required");
+      return;
     }
+
+    // Build Member-shaped object; parent will POST and return real id/createdAt
+    const member: Member = {
+      id: "", // parent will replace after successful POST
+      name: fullName,
+      email: data.email,
+      phone: data.phone || undefined,
+      linkedin: data.linkedin || undefined,
+      referredBy: data.referredBy || undefined,
+      membership: data.membership,
+      sports: (data.sports ?? []) as Sport[],
+      joiningReason: data.joiningReason || "",
+      contribution: data.contribution || "",
+      createdAt: "",
+    };
+
+    onAdd(member);
+    reset();
+    onClose();
   };
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
