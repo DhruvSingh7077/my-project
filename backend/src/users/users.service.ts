@@ -35,7 +35,7 @@ export class UserService {
         .from(this.table)
         .insert([createUserDto])
         .select()
-        .single();
+        .maybeSingle();
 
       if (result.error) {
         console.error('Supabase insert error:', result.error);
@@ -45,7 +45,13 @@ export class UserService {
           throw new ConflictException('Email already exists');
         }
 
-        throw result.error;
+        throw new InternalServerErrorException(result.error.message);
+      }
+
+      if (!result.data) {
+        throw new InternalServerErrorException(
+          'User created but no data returned',
+        );
       }
 
       console.log('Inserted user:', result.data);

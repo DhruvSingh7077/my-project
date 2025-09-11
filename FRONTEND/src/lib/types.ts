@@ -1,12 +1,7 @@
 // src/lib/types.ts
-export type MembershipType = 'Active' | 'Premium' | 'VIP' | 'Basic';
+export type MembershipType = "Active" | "Premium" | "VIP" | "Basic";
 
-export type Sport =
-  | 'Tennis'
-  | 'Badminton'
-  | 'Squash'
-  | 'Pickleball'
-  | 'Padel';
+export type Sport = "Tennis" | "Badminton" | "Squash" | "Pickleball" | "Padel";
 
 export interface Member {
   id: string;
